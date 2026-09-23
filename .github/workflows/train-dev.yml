@@ -2,12 +2,13 @@ name: Train model in dev
 
 on:
   workflow_dispatch:
+
   pull_request:
     branches:
       - main
     paths:
       - 'src/train-model-parameters.py'
-      - 'src/job.yml
+      - 'src/job.yml'
 
 permissions:
   contents: read
@@ -29,24 +30,33 @@ jobs:
 
       - name: Install Azure ML CLI
         run: |
-          az extension add -n ml -y
+          az extension add --name ml --yes
 
       - name: Detect Azure ML workspace
         id: detect
         run: |
-          RG_NAME=$(az group list --query "[?starts_with(name,'rg-ai300-l')].name | [0]" -o tsv)
+          RG_NAME=$(az group list \
+            --query "[?starts_with(name,'rg-ai300-l')].name | [0]" \
+            -o tsv)
+
           if [ -z "$RG_NAME" ]; then
             echo "No resource group starting with rg-ai300-l found." >&2
             exit 1
           fi
 
-          WS_NAME=$(az ml workspace list --resource-group "$RG_NAME" --query "[?starts_with(name,'mlw-ai300-l')].name | [0]" -o tsv)
+          WS_NAME=$(az ml workspace list \
+            --resource-group "$RG_NAME" \
+            --query "[?starts_with(name,'mlw-ai300-l')].name | [0]" \
+            -o tsv)
+
           if [ -z "$WS_NAME" ]; then
             echo "No workspace starting with mlw-ai300-l found in $RG_NAME." >&2
             exit 1
           fi
 
-          az configure --defaults group="$RG_NAME" workspace="$WS_NAME"
+          az configure --defaults \
+            group="$RG_NAME" \
+            workspace="$WS_NAME"
 
           echo "resource_group=$RG_NAME" >> "$GITHUB_OUTPUT"
           echo "workspace=$WS_NAME" >> "$GITHUB_OUTPUT"
@@ -55,9 +65,11 @@ jobs:
         id: train
         run: |
           JOB_NAME="diabetes-train-dev-${{ github.run_id }}"
+
           echo "Running Azure ML job: $JOB_NAME"
+
           az ml job create \
-            -f src/job.yml \
+            --file src/job.yml \
             --name "$JOB_NAME" \
             --set inputs.training_data.path=azureml:diabetes-dev-folder@latest \
             --stream | tee training_output.log
@@ -90,10 +102,17 @@ jobs:
             const prNumber = context.payload.pull_request.number;
 
             let body = '✅ Dev training workflow completed.';
+
             if (acc || auc) {
               body += '\n\n**Dev evaluation metrics**';
-              if (acc) body += `\n- Accuracy: ${acc}`;
-              if (auc) body += `\n- AUC: ${auc}`;
+
+              if (acc) {
+                body += `\n- Accuracy: ${acc}`;
+              }
+
+              if (auc) {
+                body += `\n- AUC: ${auc}`;
+              }
             } else {
               body += '\n\nMetrics could not be parsed from logs. Check the Azure Machine Learning job run for details.';
             }
